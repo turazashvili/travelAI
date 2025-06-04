@@ -203,28 +203,38 @@ export class EmailTemplateService {
     return `
     <tr>
         <td style="padding: 30px;">
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px; margin-bottom: 30px;">
-                <div style="background-color: #dbeafe; border-radius: 8px; padding: 20px; text-align: center;">
-                    <div style="font-size: 24px; margin-bottom: 5px;">📅</div>
-                    <div style="color: #1e40af; font-weight: 600; font-size: 18px;">${stats.totalDays}</div>
-                    <div style="color: #3730a3; font-size: 12px;">Days</div>
-                </div>
-                <div style="background-color: #dcfce7; border-radius: 8px; padding: 20px; text-align: center;">
-                    <div style="font-size: 24px; margin-bottom: 5px;">📋</div>
-                    <div style="color: #15803d; font-weight: 600; font-size: 18px;">${events.length}</div>
-                    <div style="color: #166534; font-size: 12px;">Bookings</div>
-                </div>
-                <div style="background-color: #fef3c7; border-radius: 8px; padding: 20px; text-align: center;">
-                    <div style="font-size: 24px; margin-bottom: 5px;">✈️</div>
-                    <div style="color: #d97706; font-weight: 600; font-size: 18px;">${stats.flightCount}</div>
-                    <div style="color: #92400e; font-size: 12px;">Flights</div>
-                </div>
-                <div style="background-color: #fce7f3; border-radius: 8px; padding: 20px; text-align: center;">
-                    <div style="font-size: 24px; margin-bottom: 5px;">🏨</div>
-                    <div style="color: #be185d; font-weight: 600; font-size: 18px;">${stats.hotelCount}</div>
-                    <div style="color: #9d174d; font-size: 12px;">Hotels</div>
-                </div>
-            </div>
+            <table role="presentation" style="width: 100%; margin-bottom: 30px;">
+                <tr>
+                    <td style="width: 25%; text-align: center; padding: 15px;">
+                        <div style="background-color: #dbeafe; border-radius: 8px; padding: 15px 10px;">
+                            <div style="font-size: 20px; margin-bottom: 3px;">📅</div>
+                            <div style="color: #1e40af; font-weight: 600; font-size: 16px;">${stats.totalDays}</div>
+                            <div style="color: #3730a3; font-size: 11px;">Days</div>
+                        </div>
+                    </td>
+                    <td style="width: 25%; text-align: center; padding: 15px;">
+                        <div style="background-color: #dcfce7; border-radius: 8px; padding: 15px 10px;">
+                            <div style="font-size: 20px; margin-bottom: 3px;">📋</div>
+                            <div style="color: #15803d; font-weight: 600; font-size: 16px;">${events.length}</div>
+                            <div style="color: #166534; font-size: 11px;">Bookings</div>
+                        </div>
+                    </td>
+                    <td style="width: 25%; text-align: center; padding: 15px;">
+                        <div style="background-color: #fef3c7; border-radius: 8px; padding: 15px 10px;">
+                            <div style="font-size: 20px; margin-bottom: 3px;">✈️</div>
+                            <div style="color: #d97706; font-weight: 600; font-size: 16px;">${stats.flightCount}</div>
+                            <div style="color: #92400e; font-size: 11px;">Flights</div>
+                        </div>
+                    </td>
+                    <td style="width: 25%; text-align: center; padding: 15px;">
+                        <div style="background-color: #fce7f3; border-radius: 8px; padding: 15px 10px;">
+                            <div style="font-size: 20px; margin-bottom: 3px;">🏨</div>
+                            <div style="color: #be185d; font-weight: 600; font-size: 16px;">${stats.hotelCount}</div>
+                            <div style="color: #9d174d; font-size: 11px;">Hotels</div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
         </td>
     </tr>`;
   }
@@ -275,17 +285,56 @@ export class EmailTemplateService {
   }
 
   private generateInsightsSection(insights: string): string {
+    // Parse and format the insights from AI
+    const formattedInsights = this.formatAIInsights(insights);
+    
     return `
     <tr>
         <td style="padding: 0 30px 30px 30px;">
             <div style="background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%); border-radius: 12px; padding: 25px; margin: 20px 0;">
-                <h3 style="color: #92400e; margin: 0 0 15px 0; font-size: 20px; display: flex; align-items: center; gap: 10px;">
+                <h3 style="color: #92400e; margin: 0 0 20px 0; font-size: 20px; display: flex; align-items: center; gap: 10px;">
                     🧠 AI Travel Insights
                 </h3>
-                <p style="color: #78350f; margin: 0; font-size: 16px; line-height: 1.6;">${insights}</p>
+                ${formattedInsights}
             </div>
         </td>
     </tr>`;
+  }
+
+  private formatAIInsights(insights: string): string {
+    // Clean up the insights and convert to structured HTML
+    const points = insights
+      .split(/\d+\.\s*\*\*/)
+      .filter(point => point.trim().length > 0)
+      .map(point => {
+        // Extract title and description
+        const titleMatch = point.match(/^([^*]+)\*\*:\s*(.*)/);
+        if (titleMatch) {
+          const title = titleMatch[1].trim();
+          const description = titleMatch[2].trim();
+          return { title, description };
+        } else {
+          // Fallback for different formatting
+          const cleanPoint = point.replace(/\*\*/g, '').trim();
+          return { title: 'Travel Tip', description: cleanPoint };
+        }
+      });
+
+    let html = '';
+    points.forEach((point, index) => {
+      if (point.description) {
+        html += `
+          <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: ${index === points.length - 1 ? '0' : '18px'};">
+            <div style="background-color: #f59e0b; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; flex-shrink: 0; margin-top: 2px;">${index + 1}</div>
+            <div style="flex: 1;">
+              <h4 style="margin: 0 0 6px 0; color: #92400e; font-size: 16px; font-weight: 600;">${point.title}</h4>
+              <p style="margin: 0; color: #78350f; font-size: 14px; line-height: 1.5;">${point.description}</p>
+            </div>
+          </div>`;
+      }
+    });
+
+    return html || `<p style="color: #78350f; margin: 0; font-size: 16px; line-height: 1.6;">${insights}</p>`;
   }
 
   private generateSuggestionsSection(suggestions: DestinationSuggestions): string {
@@ -293,6 +342,12 @@ export class EmailTemplateService {
     <tr>
         <td style="padding: 0 30px 30px 30px;">
             <h2 style="color: #1f2937; margin: 0 0 25px 0; font-size: 24px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">🌟 AI-Powered Recommendations</h2>
+            
+            <!-- Daily Plans -->
+            ${suggestions.dailyPlans ? this.generateDailyPlansSection(suggestions.dailyPlans) : ''}
+            
+            <!-- Navigation from Hotel -->
+            ${suggestions.navigationFromHotel ? this.generateNavigationSection(suggestions.navigationFromHotel) : ''}
             
             <!-- Restaurants -->
             ${this.generateRestaurantSection(suggestions.restaurants)}
@@ -309,10 +364,99 @@ export class EmailTemplateService {
             <!-- Transportation -->
             ${this.generateTransportationSection(suggestions.transportation)}
             
+            <!-- Cultural Etiquette -->
+            ${suggestions.culturalEtiquette ? this.generateCulturalEtiquetteSection(suggestions.culturalEtiquette) : ''}
+            
             <!-- Weather -->
             ${this.generateWeatherSection(suggestions.weather)}
         </td>
     </tr>`;
+  }
+
+  private generateDailyPlansSection(dailyPlans: any[]): string {
+    let html = `
+    <div style="margin-bottom: 40px;">
+        <h3 style="color: #8b5cf6; margin: 0 0 20px 0; font-size: 20px; display: flex; align-items: center; gap: 8px;">
+            📅 Daily Travel Plans
+        </h3>`;
+    
+    dailyPlans.slice(0, 5).forEach(plan => {
+      html += `
+        <div style="background-color: #f5f3ff; border-radius: 12px; padding: 20px; margin-bottom: 20px; border-left: 4px solid #8b5cf6;">
+            <h4 style="margin: 0 0 8px 0; color: #6d28d9; font-size: 18px;">Day ${plan.day}: ${plan.title}</h4>
+            <p style="margin: 0 0 15px 0; color: #7c3aed; font-size: 14px; font-style: italic;">${plan.theme}</p>
+            <div style="space-y: 10px;">`;
+      
+      plan.activities.forEach(activity => {
+        html += `
+                <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; padding: 12px; background-color: white; border-radius: 8px;">
+                    <div style="background-color: #8b5cf6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; min-width: 60px; text-align: center;">${activity.time}</div>
+                    <div style="flex: 1;">
+                        <p style="margin: 0 0 4px 0; color: #4c1d95; font-weight: 600; font-size: 14px;">${activity.activity}</p>
+                        <p style="margin: 0 0 4px 0; color: #6b46c1; font-size: 12px;">📍 ${activity.location}</p>
+                        ${activity.notes ? `<p style="margin: 0 0 4px 0; color: #7c3aed; font-size: 12px;">💡 ${activity.notes}</p>` : ''}
+                        ${activity.estimatedCost ? `<p style="margin: 0; color: #059669; font-size: 12px; font-weight: 500;">💰 ${activity.estimatedCost}</p>` : ''}
+                    </div>
+                </div>`;
+      });
+      
+      html += `
+            </div>
+        </div>`;
+    });
+    
+    html += `
+    </div>`;
+    
+    return html;
+  }
+
+  private generateNavigationSection(navigation: any[]): string {
+    let html = `
+    <div style="margin-bottom: 30px;">
+        <h3 style="color: #f59e0b; margin: 0 0 15px 0; font-size: 18px; display: flex; align-items: center; gap: 8px;">
+            🧭 Navigation from Your Hotel
+        </h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px;">`;
+    
+    navigation.slice(0, 6).forEach(nav => {
+      html += `
+            <div style="background-color: #fef3c7; border-radius: 8px; padding: 15px; border-left: 4px solid #f59e0b;">
+                <h4 style="margin: 0 0 8px 0; color: #d97706; font-size: 14px; font-weight: 600;">📍 ${nav.destination}</h4>
+                <p style="margin: 0 0 5px 0; color: #92400e; font-size: 13px;"><strong>${nav.method}</strong> • ${nav.duration}</p>
+                <p style="margin: 0 0 8px 0; color: #78350f; font-size: 12px; line-height: 1.4;">${nav.instructions}</p>
+                <p style="margin: 0; color: #059669; font-size: 12px; font-weight: 500;">💰 ${nav.cost}</p>
+            </div>`;
+    });
+    
+    html += `
+        </div>
+    </div>`;
+    
+    return html;
+  }
+
+  private generateCulturalEtiquetteSection(etiquette: any[]): string {
+    let html = `
+    <div style="margin-bottom: 30px;">
+        <h3 style="color: #ec4899; margin: 0 0 15px 0; font-size: 18px; display: flex; align-items: center; gap: 8px;">
+            🤝 Cultural Etiquette
+        </h3>
+        <div style="background-color: #fdf2f8; border-radius: 12px; padding: 20px; border-left: 4px solid #ec4899;">`;
+    
+    etiquette.forEach((item, index) => {
+      html += `
+            <div style="margin-bottom: ${index === etiquette.length - 1 ? '0' : '15px'};">
+                <h4 style="margin: 0 0 5px 0; color: #be185d; font-size: 14px; font-weight: 600;">${item.category}</h4>
+                <p style="margin: 0; color: #9d174d; font-size: 13px; line-height: 1.4;">${item.advice}</p>
+            </div>`;
+    });
+    
+    html += `
+        </div>
+    </div>`;
+    
+    return html;
   }
 
   private generateRestaurantSection(restaurants: any[]): string {
@@ -321,15 +465,23 @@ export class EmailTemplateService {
         <h3 style="color: #dc2626; margin: 0 0 15px 0; font-size: 18px; display: flex; align-items: center; gap: 8px;">
             🍽️ Recommended Restaurants
         </h3>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px;">`;
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;">`;
     
     restaurants.slice(0, 4).forEach(restaurant => {
       html += `
             <div style="background-color: #fef2f2; border-radius: 8px; padding: 20px; border-left: 4px solid #dc2626;">
                 <h4 style="margin: 0 0 8px 0; color: #991b1b; font-size: 16px;">${restaurant.name}</h4>
-                <p style="margin: 0 0 8px 0; color: #7f1d1d; font-size: 12px; font-weight: 500;">${restaurant.cuisine} • ${restaurant.priceRange}</p>
-                <p style="margin: 0 0 8px 0; color: #7c2d12; font-size: 14px; line-height: 1.4;">${restaurant.description}</p>
-                <p style="margin: 0; color: #92400e; font-size: 12px;">📍 ${restaurant.location}</p>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <p style="margin: 0; color: #7f1d1d; font-size: 12px; font-weight: 500;">${restaurant.cuisine} • ${restaurant.priceRange}</p>
+                    ${restaurant.rating ? `<span style="background-color: #059669; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold;">⭐ ${restaurant.rating}</span>` : ''}
+                </div>
+                <p style="margin: 0 0 10px 0; color: #7c2d12; font-size: 14px; line-height: 1.4;">${restaurant.description}</p>
+                ${restaurant.specialDishes && restaurant.specialDishes.length > 0 ? `<p style="margin: 0 0 8px 0; color: #92400e; font-size: 12px;"><strong>Must try:</strong> ${restaurant.specialDishes.join(', ')}</p>` : ''}
+                <p style="margin: 0 0 8px 0; color: #92400e; font-size: 12px;">📍 ${restaurant.location}</p>
+                <div style="display: flex; gap: 8px; margin-top: 8px;">
+                    ${restaurant.googleMapsUrl ? `<a href="${restaurant.googleMapsUrl}" style="background-color: #dc2626; color: white; text-decoration: none; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold;">📍 Maps</a>` : ''}
+                    ${restaurant.website && restaurant.website !== 'null' ? `<a href="${restaurant.website}" style="background-color: #059669; color: white; text-decoration: none; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold;">🌐 Website</a>` : ''}
+                </div>
             </div>`;
     });
     
@@ -346,15 +498,23 @@ export class EmailTemplateService {
         <h3 style="color: #2563eb; margin: 0 0 15px 0; font-size: 18px; display: flex; align-items: center; gap: 8px;">
             🏛️ Must-See Attractions
         </h3>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px;">`;
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;">`;
     
-    sightseeing.slice(0, 4).forEach(sight => {
+    sightseeing.slice(0, 5).forEach(sight => {
       html += `
             <div style="background-color: #eff6ff; border-radius: 8px; padding: 20px; border-left: 4px solid #2563eb;">
                 <h4 style="margin: 0 0 8px 0; color: #1d4ed8; font-size: 16px;">${sight.name}</h4>
-                <p style="margin: 0 0 8px 0; color: #1e40af; font-size: 12px; font-weight: 500;">${sight.type} • ${sight.estimatedTime}</p>
-                <p style="margin: 0 0 8px 0; color: #1e3a8a; font-size: 14px; line-height: 1.4;">${sight.description}</p>
-                <p style="margin: 0; color: #1e40af; font-size: 12px;">📍 ${sight.location}</p>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <p style="margin: 0; color: #1e40af; font-size: 12px; font-weight: 500;">${sight.type} • ${sight.estimatedTime}</p>
+                    ${sight.entranceFee ? `<span style="background-color: #f59e0b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold;">💳 ${sight.entranceFee}</span>` : ''}
+                </div>
+                <p style="margin: 0 0 10px 0; color: #1e3a8a; font-size: 14px; line-height: 1.4;">${sight.description}</p>
+                ${sight.bestTimeToVisit ? `<p style="margin: 0 0 8px 0; color: #1e40af; font-size: 12px;"><strong>Best time:</strong> ${sight.bestTimeToVisit}</p>` : ''}
+                <p style="margin: 0 0 8px 0; color: #1e40af; font-size: 12px;">📍 ${sight.location}</p>
+                <div style="display: flex; gap: 8px; margin-top: 8px;">
+                    ${sight.googleMapsUrl ? `<a href="${sight.googleMapsUrl}" style="background-color: #2563eb; color: white; text-decoration: none; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold;">📍 Maps</a>` : ''}
+                    ${sight.website && sight.website !== 'null' ? `<a href="${sight.website}" style="background-color: #059669; color: white; text-decoration: none; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold;">🌐 Website</a>` : ''}
+                </div>
             </div>`;
     });
     
@@ -371,15 +531,23 @@ export class EmailTemplateService {
         <h3 style="color: #059669; margin: 0 0 15px 0; font-size: 18px; display: flex; align-items: center; gap: 8px;">
             🎯 Unique Experiences
         </h3>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px;">`;
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;">`;
     
     activities.slice(0, 4).forEach(activity => {
       html += `
             <div style="background-color: #ecfdf5; border-radius: 8px; padding: 20px; border-left: 4px solid #059669;">
                 <h4 style="margin: 0 0 8px 0; color: #047857; font-size: 16px;">${activity.name}</h4>
-                <p style="margin: 0 0 8px 0; color: #065f46; font-size: 12px; font-weight: 500;">${activity.type} • ${activity.duration}</p>
-                <p style="margin: 0 0 8px 0; color: #064e3b; font-size: 14px; line-height: 1.4;">${activity.description}</p>
-                <p style="margin: 0; color: #047857; font-size: 12px;">📍 ${activity.location}</p>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <p style="margin: 0; color: #065f46; font-size: 12px; font-weight: 500;">${activity.type} • ${activity.duration}</p>
+                    ${activity.price ? `<span style="background-color: #059669; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold;">💰 ${activity.price}</span>` : ''}
+                </div>
+                <p style="margin: 0 0 10px 0; color: #064e3b; font-size: 14px; line-height: 1.4;">${activity.description}</p>
+                ${activity.bookingRequired ? `<p style="margin: 0 0 8px 0; color: #dc2626; font-size: 12px; font-weight: 500;">⚠️ Advance booking required</p>` : ''}
+                <p style="margin: 0 0 8px 0; color: #047857; font-size: 12px;">📍 ${activity.location}</p>
+                <div style="display: flex; gap: 8px; margin-top: 8px;">
+                    ${activity.googleMapsUrl ? `<a href="${activity.googleMapsUrl}" style="background-color: #059669; color: white; text-decoration: none; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold;">📍 Maps</a>` : ''}
+                    ${activity.website && activity.website !== 'null' ? `<a href="${activity.website}" style="background-color: #f59e0b; color: white; text-decoration: none; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold;">🎫 Book</a>` : ''}
+                </div>
             </div>`;
     });
     
@@ -390,7 +558,7 @@ export class EmailTemplateService {
     return html;
   }
 
-  private generateLocalTipsSection(tips: string[]): string {
+  private generateLocalTipsSection(tips: any[]): string {
     let html = `
     <div style="margin-bottom: 30px;">
         <h3 style="color: #7c3aed; margin: 0 0 15px 0; font-size: 18px; display: flex; align-items: center; gap: 8px;">
@@ -398,11 +566,24 @@ export class EmailTemplateService {
         </h3>
         <div style="background-color: #f5f3ff; border-radius: 8px; padding: 20px; border-left: 4px solid #7c3aed;">`;
     
-    tips.slice(0, 5).forEach((tip, index) => {
+    // Handle both old format (strings) and new format (objects)
+    const formattedTips = Array.isArray(tips) && tips.length > 0 
+      ? (typeof tips[0] === 'string' 
+          ? tips.map((tip, index) => ({ category: `Tip ${index + 1}`, tip, importance: 'medium' }))
+          : tips)
+      : [];
+    
+    formattedTips.slice(0, 6).forEach((tip, index) => {
+      const importanceColor = tip.importance === 'high' ? '#dc2626' : tip.importance === 'low' ? '#6b7280' : '#7c3aed';
+      const importanceIcon = tip.importance === 'high' ? '⚡' : tip.importance === 'low' ? '💡' : '⭐';
+      
       html += `
-            <div style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: ${index === tips.length - 1 ? '0' : '15px'};">
-                <span style="background-color: #7c3aed; color: white; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; flex-shrink: 0;">${index + 1}</span>
-                <p style="margin: 0; color: #5b21b6; font-size: 14px; line-height: 1.5;">${tip}</p>
+            <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: ${index === formattedTips.length - 1 ? '0' : '18px'};">
+                <span style="background-color: ${importanceColor}; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0;">${importanceIcon}</span>
+                <div style="flex: 1;">
+                    <h4 style="margin: 0 0 4px 0; color: #5b21b6; font-size: 14px; font-weight: 600;">${tip.category}</h4>
+                    <p style="margin: 0; color: #6d28d9; font-size: 13px; line-height: 1.5;">${tip.tip}</p>
+                </div>
             </div>`;
     });
     
@@ -419,14 +600,20 @@ export class EmailTemplateService {
         <h3 style="color: #ea580c; margin: 0 0 15px 0; font-size: 18px; display: flex; align-items: center; gap: 8px;">
             🚗 Getting Around
         </h3>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">`;
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px;">`;
     
     transportation.forEach(transport => {
       html += `
-            <div style="background-color: #fff7ed; border-radius: 8px; padding: 15px; border-left: 4px solid #ea580c;">
-                <h4 style="margin: 0 0 8px 0; color: #c2410c; font-size: 14px; font-weight: 600;">${transport.type}</h4>
-                <p style="margin: 0 0 5px 0; color: #9a3412; font-size: 13px; line-height: 1.4;">${transport.description}</p>
-                <p style="margin: 0; color: #c2410c; font-size: 12px; font-weight: 500;">💰 ${transport.cost}</p>
+            <div style="background-color: #fff7ed; border-radius: 8px; padding: 18px; border-left: 4px solid #ea580c;">
+                <h4 style="margin: 0 0 10px 0; color: #c2410c; font-size: 16px; font-weight: 600;">${transport.type}</h4>
+                <p style="margin: 0 0 8px 0; color: #9a3412; font-size: 14px; line-height: 1.4;">${transport.description}</p>
+                <p style="margin: 0 0 10px 0; color: #c2410c; font-size: 13px; font-weight: 500;">💰 ${transport.cost}</p>
+                ${transport.downloadApps && transport.downloadApps.length > 0 ? `
+                <div style="margin-bottom: 8px;">
+                    <p style="margin: 0 0 4px 0; color: #92400e; font-size: 12px; font-weight: 600;">📱 Recommended Apps:</p>
+                    <p style="margin: 0; color: #78350f; font-size: 12px;">${transport.downloadApps.join(', ')}</p>
+                </div>` : ''}
+                ${transport.tips ? `<p style="margin: 0; color: #92400e; font-size: 12px;"><strong>💡 Tip:</strong> ${transport.tips}</p>` : ''}
             </div>`;
     });
     
@@ -439,12 +626,27 @@ export class EmailTemplateService {
 
   private generateWeatherSection(weather: any): string {
     return `
-    <div style="background-color: #f0f9ff; border-radius: 12px; padding: 20px; border-left: 4px solid #0ea5e9;">
-        <h3 style="color: #0369a1; margin: 0 0 15px 0; font-size: 18px; display: flex; align-items: center; gap: 8px;">
-            🌤️ Weather & Packing
+    <div style="background-color: #f0f9ff; border-radius: 12px; padding: 25px; border-left: 4px solid #0ea5e9;">
+        <h3 style="color: #0369a1; margin: 0 0 18px 0; font-size: 18px; display: flex; align-items: center; gap: 8px;">
+            🌤️ Weather & Packing Guide
         </h3>
-        <p style="margin: 0 0 10px 0; color: #075985; font-size: 16px; font-weight: 500;">${weather.description}</p>
-        <p style="margin: 0; color: #0c4a6e; font-size: 14px; line-height: 1.5;">${weather.suggestion}</p>
+        <div style="margin-bottom: 15px;">
+            <h4 style="margin: 0 0 8px 0; color: #075985; font-size: 16px; font-weight: 600;">Current Weather</h4>
+            <p style="margin: 0; color: #0369a1; font-size: 14px; line-height: 1.5;">${weather.description}</p>
+        </div>
+        <div style="margin-bottom: 15px;">
+            <h4 style="margin: 0 0 8px 0; color: #075985; font-size: 16px; font-weight: 600;">Travel Advice</h4>
+            <p style="margin: 0; color: #0c4a6e; font-size: 14px; line-height: 1.5;">${weather.suggestion}</p>
+        </div>
+        ${weather.whatToPack && weather.whatToPack.length > 0 ? `
+        <div>
+            <h4 style="margin: 0 0 10px 0; color: #075985; font-size: 16px; font-weight: 600;">🎒 Packing Essentials</h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px;">
+                ${weather.whatToPack.map(item => `
+                <span style="background-color: #0ea5e9; color: white; padding: 4px 8px; border-radius: 6px; font-size: 12px; text-align: center;">${item}</span>
+                `).join('')}
+            </div>
+        </div>` : ''}
     </div>`;
   }
 

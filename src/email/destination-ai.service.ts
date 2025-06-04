@@ -10,6 +10,11 @@ export interface DestinationSuggestions {
     description: string;
     priceRange: string;
     location: string;
+    googleMapsUrl?: string;
+    website?: string;
+    photoUrl?: string;
+    rating?: string;
+    specialDishes?: string[];
   }>;
   sightseeing: Array<{
     name: string;
@@ -17,6 +22,11 @@ export interface DestinationSuggestions {
     description: string;
     estimatedTime: string;
     location: string;
+    googleMapsUrl?: string;
+    website?: string;
+    photoUrl?: string;
+    entranceFee?: string;
+    bestTimeToVisit?: string;
   }>;
   activities: Array<{
     name: string;
@@ -24,17 +34,52 @@ export interface DestinationSuggestions {
     description: string;
     duration: string;
     location: string;
+    googleMapsUrl?: string;
+    website?: string;
+    photoUrl?: string;
+    price?: string;
+    bookingRequired?: boolean;
   }>;
-  localTips: string[];
+  dailyPlans: Array<{
+    day: number;
+    title: string;
+    theme: string;
+    activities: Array<{
+      time: string;
+      activity: string;
+      location: string;
+      notes?: string;
+      estimatedCost?: string;
+    }>;
+  }>;
+  navigationFromHotel: Array<{
+    destination: string;
+    method: string;
+    duration: string;
+    cost: string;
+    instructions: string;
+  }>;
+  localTips: Array<{
+    category: string;
+    tip: string;
+    importance: 'high' | 'medium' | 'low';
+  }>;
   transportation: Array<{
     type: string;
     description: string;
     cost: string;
+    downloadApps?: string[];
+    tips?: string;
   }>;
   weather: {
     description: string;
     suggestion: string;
+    whatToPack: string[];
   };
+  culturalEtiquette: Array<{
+    category: string;
+    advice: string;
+  }>;
 }
 
 @Injectable()
@@ -142,25 +187,34 @@ Return only the text, no JSON structure.
 
     const currentMonth = trip.startDate ? trip.startDate.getMonth() + 1 : new Date().getMonth() + 1;
     
+    // Get hotel information if available
+    const hotelEvent = events.find(e => e.type === 'hotel');
+    const hotelLocation = hotelEvent?.location?.address || hotelEvent?.title || 'hotel area';
+    
     return `
-Generate travel recommendations for a trip to ${trip.destination}.
+Generate comprehensive travel recommendations for a trip to ${trip.destination}.
 
 TRIP DETAILS:
 - Destination: ${trip.destination}
 - Duration: ${duration} days
 - Month: ${currentMonth}
+- Hotel/Accommodation: ${hotelLocation}
 - Existing bookings: ${events.map(e => `${e.type} (${e.title})`).join(', ')}
 
-Return a JSON object with this exact structure:
+Return a JSON object with this exact structure (include all fields):
 
 {
   "restaurants": [
     {
       "name": "Restaurant Name",
-      "cuisine": "Type of cuisine",
+      "cuisine": "Type of cuisine", 
       "description": "Brief description and why it's recommended",
       "priceRange": "$$ | $$$ | $$$$",
-      "location": "Area/district in the city"
+      "location": "Area/district in the city",
+      "googleMapsUrl": "https://maps.google.com/search/restaurant+name+${trip.destination}",
+      "website": "official website if known or null",
+      "rating": "4.5/5 stars",
+      "specialDishes": ["dish1", "dish2"]
     }
   ],
   "sightseeing": [
@@ -169,7 +223,11 @@ Return a JSON object with this exact structure:
       "type": "Museum/Park/Historic Site/etc",
       "description": "What makes this special and worth visiting",
       "estimatedTime": "2-3 hours",
-      "location": "Area/district"
+      "location": "Area/district",
+      "googleMapsUrl": "https://maps.google.com/search/attraction+name+${trip.destination}",
+      "website": "official website if known or null",
+      "entranceFee": "Free | $10 | $20-30",
+      "bestTimeToVisit": "Morning | Afternoon | Evening"
     }
   ],
   "activities": [
@@ -178,36 +236,79 @@ Return a JSON object with this exact structure:
       "type": "Tour/Adventure/Cultural/etc",
       "description": "What the activity involves",
       "duration": "Half day/Full day/2 hours",
-      "location": "Where it takes place"
+      "location": "Where it takes place",
+      "googleMapsUrl": "https://maps.google.com/search/activity+name+${trip.destination}",
+      "website": "booking website if known or null",
+      "price": "$50-100 per person",
+      "bookingRequired": true
+    }
+  ],
+  "dailyPlans": [
+    {
+      "day": 1,
+      "title": "Arrival & City Center",
+      "theme": "Getting oriented",
+      "activities": [
+        {
+          "time": "10:00 AM",
+          "activity": "Check-in and explore nearby area",
+          "location": "Hotel area",
+          "notes": "Get oriented, grab local SIM card",
+          "estimatedCost": "$20"
+        }
+      ]
+    }
+  ],
+  "navigationFromHotel": [
+    {
+      "destination": "City Center",
+      "method": "Taxi/Metro/Bus",
+      "duration": "20-30 minutes",
+      "cost": "$5-10",
+      "instructions": "Take bus line X or use Grab app"
     }
   ],
   "localTips": [
-    "Practical tip 1",
-    "Cultural insight 2",
-    "Money-saving tip 3"
+    {
+      "category": "Transportation",
+      "tip": "Download Grab app for convenient rides",
+      "importance": "high"
+    }
   ],
   "transportation": [
     {
-      "type": "Metro/Taxi/Bus/Walking",
+      "type": "Ride-hailing",
       "description": "How to get around efficiently",
-      "cost": "Approximate cost range"
+      "cost": "Approximate cost range",
+      "downloadApps": ["Grab", "GoJek"],
+      "tips": "Always check driver rating"
     }
   ],
   "weather": {
     "description": "Expected weather for month ${currentMonth}",
-    "suggestion": "What to pack or expect"
-  }
+    "suggestion": "What to pack or expect",
+    "whatToPack": ["sunscreen", "light jacket", "umbrella"]
+  },
+  "culturalEtiquette": [
+    {
+      "category": "Dining",
+      "advice": "Remove shoes when entering homes"
+    }
+  ]
 }
 
 REQUIREMENTS:
-1. Provide 3-4 restaurants of different price ranges
-2. Include 4-5 must-see sightseeing spots
-3. Suggest 3-4 unique activities/experiences
-4. Give 4-5 practical local tips
-5. Cover main transportation options
-6. Consider the season/month for weather
-7. Be specific to ${trip.destination}, not generic advice
-8. Return valid JSON only
+1. Provide 4-5 restaurants with real Google Maps search URLs
+2. Include 5-6 must-see attractions with entrance fees and timing
+3. Suggest 4-5 unique activities with booking requirements
+4. Create ${duration} daily plans with specific times and activities
+5. Give navigation from ${hotelLocation} to popular destinations
+6. Provide categorized local tips with importance levels
+7. Include app recommendations and cultural etiquette
+8. Consider the season/month ${currentMonth} for weather and activities
+9. Be specific to ${trip.destination} with real place names
+10. All Google Maps URLs should be real search URLs
+11. Return valid JSON only with ALL required fields
 `;
   }
 
