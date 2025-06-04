@@ -4,6 +4,8 @@ import { EmailController } from './email.controller';
 import { EmailService } from './email.service';
 import { ParsingService } from './parsing.service';
 import { AIParsingService } from './ai-parsing.service';
+import { DestinationAIService } from './destination-ai.service';
+import { EmailTemplateService } from './email-template.service';
 import { ItineraryService } from './itinerary.service';
 import { User, UserSchema } from '../models/user.model';
 import { Trip, TripSchema } from '../models/trip.model';
@@ -18,6 +20,6 @@ import { TravelEvent, TravelEventSchema } from '../models/travel-event.model';
     ]),
   ],
   controllers: [EmailController],
-  providers: [EmailService, ParsingService, AIParsingService, ItineraryService],
+  providers: [EmailService, ParsingService, AIParsingService, DestinationAIService, EmailTemplateService, ItineraryService],
 })
 export class EmailModule {}

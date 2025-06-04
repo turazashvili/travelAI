@@ -6,6 +6,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { User } from '../models/user.model';
 import { Trip } from '../models/trip.model';
 import { TravelEvent } from '../models/travel-event.model';
+import { DestinationAIService } from './destination-ai.service';
+import { EmailTemplateService } from './email-template.service';
 
 @Injectable()
 export class EmailService {
@@ -15,6 +17,8 @@ export class EmailService {
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(Trip.name) private tripModel: Model<Trip>,
     @InjectModel(TravelEvent.name) private travelEventModel: Model<TravelEvent>,
+    private destinationAIService: DestinationAIService,
+    private emailTemplateService: EmailTemplateService,
   ) {
     this.postmarkClient = new postmark.ServerClient(process.env.POSTMARK_API_TOKEN);
   }
@@ -52,69 +56,77 @@ export class EmailService {
   }
 
   async sendWelcomeEmail(userEmail: string, forwardingAddress: string): Promise<void> {
-    const emailContent = `
-Hi there!
-
-Your new trip address is: ${forwardingAddress}
-
-Forward any booking confirmations to this address and I'll automatically build your itinerary.
-
-Supported bookings:
-✈️ Flights
-🏨 Hotels
-🚗 Car rentals
-🍽️ Restaurant reservations
-🎫 Activities & tours
-📋 Any other travel-related confirmations
-
-To get your complete itinerary, email this address with subject: GET ITINERARY
-
-Happy travels!
-    `.trim();
+    const htmlContent = this.emailTemplateService.generateWelcomeEmailHTML(forwardingAddress);
 
     await this.postmarkClient.sendEmail({
       From: process.env.FROM_EMAIL || 'noreply@travelbuilder.com',
       To: userEmail,
       Subject: 'Your Trip Address is Ready! 📧',
-      TextBody: emailContent,
+      HtmlBody: htmlContent,
+      TextBody: `Hi there! Your new trip address is: ${forwardingAddress}. Forward any booking confirmations to this address and I'll automatically build your itinerary. To get your complete itinerary, email this address with subject: GET ITINERARY. Happy travels!`,
     });
   }
 
   async sendBookingConfirmation(userEmail: string, eventTitle: string, eventType: string): Promise<void> {
+    const htmlContent = this.emailTemplateService.generateBookingConfirmationHTML(eventTitle, eventType);
     const emoji = this.getEmojiForType(eventType);
-    const emailContent = `
-Great! I've added this to your trip:
-
-${emoji} ${eventTitle}
-
-Your trip is being updated automatically.
-Email with "GET ITINERARY" to see the full timeline.
-    `.trim();
 
     await this.postmarkClient.sendEmail({
       From: process.env.FROM_EMAIL || 'noreply@travelbuilder.com',
       To: userEmail,
       Subject: `✅ Added to your trip: ${eventTitle}`,
-      TextBody: emailContent,
+      HtmlBody: htmlContent,
+      TextBody: `Great! I've added this to your trip: ${emoji} ${eventTitle}. Your trip is being updated automatically. Email with "GET ITINERARY" to see the full timeline.`,
     });
   }
 
   async sendItineraryEmail(userEmail: string, trip: Trip, events: TravelEvent[]): Promise<void> {
+    console.log('🤖 Generating AI-powered itinerary...');
+    
+    // Generate AI suggestions and insights in parallel
+    const [suggestions, insights] = await Promise.all([
+      this.destinationAIService.generateDestinationSuggestions(trip, events),
+      this.destinationAIService.generateTravelInsights(trip, events),
+    ]);
+
+    // Generate HTML email with AI suggestions
+    const htmlContent = this.emailTemplateService.generateItineraryEmailHTML(
+      trip, 
+      events, 
+      suggestions, 
+      insights
+    );
+
+    // Generate fallback text content
+    const textContent = this.generateFallbackTextItinerary(trip, events, insights);
+
+    console.log(`📧 Sending enhanced itinerary to ${userEmail}`);
+    
+    await this.postmarkClient.sendEmail({
+      From: process.env.FROM_EMAIL || 'noreply@travelbuilder.com',
+      To: userEmail,
+      Subject: '🗓️ Your AI-Enhanced Travel Itinerary',
+      HtmlBody: htmlContent,
+      TextBody: textContent,
+    });
+  }
+
+  private generateFallbackTextItinerary(trip: Trip, events: TravelEvent[], insights?: string): string {
     const sortedEvents = events.sort((a, b) => 
       (a.startDateTime || a.createdAt).getTime() - (b.startDateTime || b.createdAt).getTime()
     );
 
-    let itineraryContent = `Here's your trip timeline:\n\n`;
+    let content = `🗓️ Your Complete Itinerary\n\n`;
     
     if (trip.destination) {
-      itineraryContent += `📍 DESTINATION: ${trip.destination}\n`;
+      content += `📍 DESTINATION: ${trip.destination}\n`;
     }
     
     if (trip.startDate && trip.endDate) {
-      itineraryContent += `📅 DATES: ${trip.startDate.toDateString()} - ${trip.endDate.toDateString()}\n`;
+      content += `📅 DATES: ${trip.startDate.toDateString()} - ${trip.endDate.toDateString()}\n`;
     }
     
-    itineraryContent += `\nTIMELINE:\n─────────\n\n`;
+    content += `\nTIMELINE:\n─────────\n\n`;
 
     let currentDate = '';
     for (const event of sortedEvents) {
@@ -122,33 +134,32 @@ Email with "GET ITINERARY" to see the full timeline.
       
       if (eventDate !== currentDate) {
         currentDate = eventDate;
-        itineraryContent += `[${eventDate}]\n`;
+        content += `[${eventDate}]\n`;
       }
       
       const time = event.startDateTime ? event.startDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
       const emoji = this.getEmojiForType(event.type);
       
-      itineraryContent += `${time ? `🕐 ${time} - ` : ''}${emoji} ${event.title}\n`;
+      content += `${time ? `🕐 ${time} - ` : ''}${emoji} ${event.title}\n`;
       
       if (event.location?.address) {
-        itineraryContent += `📍 ${event.location.address}\n`;
+        content += `📍 ${event.location.address}\n`;
       }
       
       if (event.confirmationNumber) {
-        itineraryContent += `🔗 Confirmation: ${event.confirmationNumber}\n`;
+        content += `🔗 Confirmation: ${event.confirmationNumber}\n`;
       }
       
-      itineraryContent += `\n`;
+      content += `\n`;
     }
 
-    itineraryContent += `Total bookings: ${events.length}\nSafe travels! 🌟`;
+    if (insights) {
+      content += `\n🧠 AI Travel Insights:\n${insights}\n\n`;
+    }
 
-    await this.postmarkClient.sendEmail({
-      From: process.env.FROM_EMAIL || 'noreply@travelbuilder.com',
-      To: userEmail,
-      Subject: '🗓️ Your Complete Itinerary',
-      TextBody: itineraryContent,
-    });
+    content += `Total bookings: ${events.length}\nSafe travels! 🌟\n\nGenerated by AI-powered Travel Itinerary Builder`;
+
+    return content;
   }
 
   private getEmojiForType(type: string): string {
