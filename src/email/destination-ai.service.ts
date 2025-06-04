@@ -110,30 +110,183 @@ export class DestinationAIService {
         messages: [
           {
             role: 'system',
-            content: `You are a comprehensive travel expert and local guide. You MUST return complete JSON responses with ALL required fields including links, prices, and detailed information. Never return partial responses. Include real Google Maps URLs and practical information.`
+            content: `You are a comprehensive travel expert and local guide. Generate complete travel recommendations with ALL required fields including links, prices, and detailed information. You must respond using the generate_suggestions function only.`
           },
           {
             role: 'user',
             content: prompt
           }
         ],
+        functions: [
+          {
+            name: "generate_suggestions",
+            description: "Generate comprehensive travel destination recommendations",
+            parameters: {
+              type: "object",
+              properties: {
+                restaurants: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      name: { type: "string" },
+                      cuisine: { type: "string" },
+                      description: { type: "string" },
+                      priceRange: { type: "string" },
+                      location: { type: "string" },
+                      googleMapsUrl: { type: "string" },
+                      website: { type: "string" },
+                      rating: { type: "string" },
+                      specialDishes: { type: "array", items: { type: "string" } }
+                    },
+                    required: ["name", "cuisine", "description", "priceRange", "location", "googleMapsUrl", "rating", "specialDishes"]
+                  }
+                },
+                sightseeing: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      name: { type: "string" },
+                      type: { type: "string" },
+                      description: { type: "string" },
+                      estimatedTime: { type: "string" },
+                      location: { type: "string" },
+                      googleMapsUrl: { type: "string" },
+                      website: { type: "string" },
+                      entranceFee: { type: "string" },
+                      bestTimeToVisit: { type: "string" }
+                    },
+                    required: ["name", "type", "description", "estimatedTime", "location", "googleMapsUrl", "entranceFee", "bestTimeToVisit"]
+                  }
+                },
+                activities: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      name: { type: "string" },
+                      type: { type: "string" },
+                      description: { type: "string" },
+                      duration: { type: "string" },
+                      location: { type: "string" },
+                      googleMapsUrl: { type: "string" },
+                      website: { type: "string" },
+                      price: { type: "string" },
+                      bookingRequired: { type: "boolean" }
+                    },
+                    required: ["name", "type", "description", "duration", "location", "googleMapsUrl", "price", "bookingRequired"]
+                  }
+                },
+                dailyPlans: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      day: { type: "number" },
+                      title: { type: "string" },
+                      theme: { type: "string" },
+                      activities: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            time: { type: "string" },
+                            activity: { type: "string" },
+                            location: { type: "string" },
+                            notes: { type: "string" },
+                            estimatedCost: { type: "string" }
+                          },
+                          required: ["time", "activity", "location", "estimatedCost"]
+                        }
+                      }
+                    },
+                    required: ["day", "title", "theme", "activities"]
+                  }
+                },
+                navigationFromHotel: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      destination: { type: "string" },
+                      method: { type: "string" },
+                      duration: { type: "string" },
+                      cost: { type: "string" },
+                      instructions: { type: "string" }
+                    },
+                    required: ["destination", "method", "duration", "cost", "instructions"]
+                  }
+                },
+                localTips: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      category: { type: "string" },
+                      tip: { type: "string" },
+                      importance: { type: "string", enum: ["high", "medium", "low"] }
+                    },
+                    required: ["category", "tip", "importance"]
+                  }
+                },
+                transportation: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      type: { type: "string" },
+                      description: { type: "string" },
+                      cost: { type: "string" },
+                      downloadApps: { type: "array", items: { type: "string" } },
+                      tips: { type: "string" }
+                    },
+                    required: ["type", "description", "cost", "downloadApps"]
+                  }
+                },
+                weather: {
+                  type: "object",
+                  properties: {
+                    description: { type: "string" },
+                    suggestion: { type: "string" },
+                    whatToPack: { type: "array", items: { type: "string" } }
+                  },
+                  required: ["description", "suggestion", "whatToPack"]
+                },
+                culturalEtiquette: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      category: { type: "string" },
+                      advice: { type: "string" }
+                    },
+                    required: ["category", "advice"]
+                  }
+                }
+              },
+              required: ["restaurants", "sightseeing", "activities", "dailyPlans", "navigationFromHotel", "localTips", "transportation", "weather", "culturalEtiquette"]
+            }
+          }
+        ],
+        function_call: { name: "generate_suggestions" },
         temperature: 0.3,
         max_tokens: 4000,
       });
 
-      const response = completion.choices[0]?.message?.content;
-      if (!response) {
-        throw new Error('No response from OpenAI');
+      const response = completion.choices[0]?.message;
+      if (!response || !response.function_call) {
+        throw new Error('No function call response from OpenAI');
       }
 
-      console.log('🤖 AI Response received, length:', response.length);
-      console.log('🔍 Response preview:', response.substring(0, 200));
+      console.log('🤖 Function call received:', response.function_call.name);
+      console.log('🔍 Arguments length:', response.function_call.arguments.length);
       
-      // Parse the JSON response
+      // Parse the function call arguments
       let parsed: DestinationSuggestions;
       try {
-        parsed = JSON.parse(response) as DestinationSuggestions;
-        console.log('✅ JSON parsed successfully');
+        parsed = JSON.parse(response.function_call.arguments) as DestinationSuggestions;
+        console.log('✅ Function call arguments parsed successfully');
         console.log('📊 Response structure:', {
           restaurants: parsed.restaurants?.length || 0,
           sightseeing: parsed.sightseeing?.length || 0,
@@ -144,11 +297,12 @@ export class DestinationAIService {
           hasTransportation: !!parsed.transportation,
           hasWeather: !!parsed.weather,
           hasCulturalEtiquette: !!parsed.culturalEtiquette,
+          hasLinks: parsed.restaurants?.[0]?.googleMapsUrl ? 'YES' : 'NO',
         });
       } catch (parseError) {
-        console.error('❌ JSON parsing failed:', parseError);
-        console.log('🔍 Full response:', response);
-        throw new Error('Failed to parse AI response as JSON');
+        console.error('❌ Function call parsing failed:', parseError);
+        console.log('🔍 Function arguments:', response.function_call.arguments.substring(0, 500));
+        throw new Error('Failed to parse function call arguments as JSON');
       }
       
       // Validate and clean the response
