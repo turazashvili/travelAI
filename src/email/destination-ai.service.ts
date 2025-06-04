@@ -110,15 +110,15 @@ export class DestinationAIService {
         messages: [
           {
             role: 'system',
-            content: 'You are a knowledgeable travel expert and local guide. Provide personalized, practical travel recommendations in JSON format.'
+            content: `You are a comprehensive travel expert and local guide. You MUST return complete JSON responses with ALL required fields including links, prices, and detailed information. Never return partial responses. Include real Google Maps URLs and practical information.`
           },
           {
             role: 'user',
             content: prompt
           }
         ],
-        temperature: 0.7,
-        max_tokens: 2500,
+        temperature: 0.3,
+        max_tokens: 4000,
       });
 
       const response = completion.choices[0]?.message?.content;
@@ -126,7 +126,35 @@ export class DestinationAIService {
         throw new Error('No response from OpenAI');
       }
 
-      return JSON.parse(response) as DestinationSuggestions;
+      console.log('🤖 AI Response received, length:', response.length);
+      console.log('🔍 Response preview:', response.substring(0, 200));
+      
+      // Parse the JSON response
+      let parsed: DestinationSuggestions;
+      try {
+        parsed = JSON.parse(response) as DestinationSuggestions;
+        console.log('✅ JSON parsed successfully');
+        console.log('📊 Response structure:', {
+          restaurants: parsed.restaurants?.length || 0,
+          sightseeing: parsed.sightseeing?.length || 0,
+          activities: parsed.activities?.length || 0,
+          dailyPlans: parsed.dailyPlans?.length || 0,
+          hasNavigation: !!parsed.navigationFromHotel,
+          hasLocalTips: !!parsed.localTips,
+          hasTransportation: !!parsed.transportation,
+          hasWeather: !!parsed.weather,
+          hasCulturalEtiquette: !!parsed.culturalEtiquette,
+        });
+      } catch (parseError) {
+        console.error('❌ JSON parsing failed:', parseError);
+        console.log('🔍 Full response:', response);
+        throw new Error('Failed to parse AI response as JSON');
+      }
+      
+      // Validate and clean the response
+      const validated = this.validateAndCleanAIResponse(parsed);
+      console.log('✅ AI response validated and cleaned');
+      return validated;
       
     } catch (error) {
       console.error('AI destination suggestions failed:', error);
@@ -152,8 +180,15 @@ DURATION: ${trip.startDate ? `${trip.startDate.toDateString()} to ${trip.endDate
 BOOKINGS:
 ${events.map(e => `- ${e.type}: ${e.title} ${e.startDateTime ? `on ${e.startDateTime.toDateString()}` : ''}`).join('\n')}
 
-Provide 2-3 helpful, personalized insights or tips for this specific trip. Keep it concise and practical.
-Return only the text, no JSON structure.
+Provide exactly 3 helpful, personalized insights for this specific trip. Format as:
+
+1. **Category Title**: Detailed practical advice with specific recommendations.
+2. **Category Title**: Detailed practical advice with specific recommendations.  
+3. **Category Title**: Detailed practical advice with specific recommendations.
+
+Categories should be relevant like: Local Transportation, Cultural Experiences, Food & Dining, Safety Tips, Money-Saving Tips, Best Times to Visit, Local Customs, Weather Considerations, etc.
+
+Make each insight specific to ${trip.destination} with actionable advice. Each point should be 2-3 sentences with practical details.
 `;
 
       const completion = await this.openai.chat.completions.create({
@@ -161,15 +196,15 @@ Return only the text, no JSON structure.
         messages: [
           {
             role: 'system',
-            content: 'You are a helpful travel advisor. Provide concise, practical travel insights.'
+            content: 'You are a helpful travel advisor. Provide concise, practical travel insights in the exact format requested. Always format with numbered points and bold category titles.'
           },
           {
             role: 'user',
             content: prompt
           }
         ],
-        temperature: 0.7,
-        max_tokens: 300,
+        temperature: 0.5,
+        max_tokens: 400,
       });
 
       return completion.choices[0]?.message?.content || this.generateBasicInsights(trip, events);
@@ -297,19 +332,84 @@ Return a JSON object with this exact structure (include all fields):
   ]
 }
 
-REQUIREMENTS:
-1. Provide 4-5 restaurants with real Google Maps search URLs
+CRITICAL REQUIREMENTS:
+1. Provide 4-5 restaurants with real Google Maps search URLs (format: https://maps.google.com/search/restaurant+name+${trip.destination})
 2. Include 5-6 must-see attractions with entrance fees and timing
-3. Suggest 4-5 unique activities with booking requirements
-4. Create ${duration} daily plans with specific times and activities
-5. Give navigation from ${hotelLocation} to popular destinations
-6. Provide categorized local tips with importance levels
-7. Include app recommendations and cultural etiquette
-8. Consider the season/month ${currentMonth} for weather and activities
-9. Be specific to ${trip.destination} with real place names
-10. All Google Maps URLs should be real search URLs
-11. Return valid JSON only with ALL required fields
+3. Suggest 4-5 unique activities with booking requirements and prices
+4. Create ${Math.min(duration, 5)} daily plans with specific times and activities
+5. Give navigation from ${hotelLocation} to 4-6 popular destinations
+6. Provide categorized local tips with importance levels (high/medium/low)
+7. Include app recommendations and cultural etiquette sections
+8. Consider the season/month ${currentMonth} for weather and packing
+9. Be specific to ${trip.destination} with real place names and locations
+10. ALL Google Maps URLs must be real and functional
+11. Fill ALL fields in the JSON structure - no null or empty values except where specified
+12. Return ONLY valid JSON with complete data structure
+13. Price information must be realistic and current
+14. Include specific app names for transportation
+15. Packing list must be detailed and seasonal
+
+VALIDATION CHECKLIST:
+✓ All restaurants have googleMapsUrl and rating
+✓ All attractions have entranceFee and bestTimeToVisit  
+✓ All activities have price and bookingRequired fields
+✓ Daily plans have realistic times and costs
+✓ Navigation includes specific instructions
+✓ Local tips are categorized with importance levels
+✓ Transportation includes downloadApps arrays
+✓ Weather has whatToPack array with 6+ items
+✓ Cultural etiquette has multiple categories
+✓ All required fields are filled
 `;
+  }
+
+  private validateAndCleanAIResponse(parsed: DestinationSuggestions): DestinationSuggestions {
+    // Ensure all required arrays exist
+    parsed.restaurants = parsed.restaurants || [];
+    parsed.sightseeing = parsed.sightseeing || [];
+    parsed.activities = parsed.activities || [];
+    parsed.dailyPlans = parsed.dailyPlans || [];
+    parsed.navigationFromHotel = parsed.navigationFromHotel || [];
+    parsed.localTips = parsed.localTips || [];
+    parsed.transportation = parsed.transportation || [];
+    parsed.culturalEtiquette = parsed.culturalEtiquette || [];
+
+    // Ensure weather object exists
+    if (!parsed.weather) {
+      parsed.weather = {
+        description: 'Weather information not available',
+        suggestion: 'Check local weather before travel',
+        whatToPack: ['weather-appropriate clothing'],
+      };
+    }
+
+    // Validate restaurants
+    parsed.restaurants = parsed.restaurants.map(restaurant => ({
+      ...restaurant,
+      name: restaurant.name || 'Local Restaurant',
+      cuisine: restaurant.cuisine || 'Local',
+      description: restaurant.description || 'Popular local restaurant',
+      priceRange: restaurant.priceRange || '$$',
+      location: restaurant.location || 'City center',
+      rating: restaurant.rating || '4.0/5',
+      specialDishes: restaurant.specialDishes || [],
+      googleMapsUrl: restaurant.googleMapsUrl || `https://maps.google.com/search/${encodeURIComponent(restaurant.name || 'restaurant')}`,
+    }));
+
+    // Validate activities
+    parsed.activities = parsed.activities.map(activity => ({
+      ...activity,
+      name: activity.name || 'Local Activity',
+      type: activity.type || 'Experience',
+      description: activity.description || 'Popular local activity',
+      duration: activity.duration || 'Half day',
+      location: activity.location || 'City area',
+      price: activity.price || 'Varies',
+      bookingRequired: activity.bookingRequired !== undefined ? activity.bookingRequired : false,
+      googleMapsUrl: activity.googleMapsUrl || `https://maps.google.com/search/${encodeURIComponent(activity.name || 'activity')}`,
+    }));
+
+    return parsed;
   }
 
   private generateBasicInsights(trip: Trip, events: TravelEvent[]): string {

@@ -2,6 +2,7 @@ import { Controller, Post, Body, Get, Param } from '@nestjs/common';
 import { EmailService } from './email.service';
 import { ParsingService } from './parsing.service';
 import { ItineraryService } from './itinerary.service';
+import { DestinationAIService } from './destination-ai.service';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User } from '../models/user.model';
@@ -22,6 +23,7 @@ export class EmailController {
     private emailService: EmailService,
     private parsingService: ParsingService,
     private itineraryService: ItineraryService,
+    private destinationAIService: DestinationAIService,
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(Trip.name) private tripModel: Model<Trip>,
   ) {}
@@ -119,6 +121,54 @@ export class EmailController {
   @Get('health')
   async healthCheck() {
     return { status: 'ok', timestamp: new Date().toISOString() };
+  }
+
+  @Get('test-ai/:forwardingAddress')
+  async testAIGeneration(@Param('forwardingAddress') forwardingAddress: string) {
+    try {
+      const trip = await this.emailService.findTripByForwardingAddress(forwardingAddress);
+      if (!trip) {
+        return { error: 'Trip not found' };
+      }
+
+      const events = await this.itineraryService.getTripEvents(trip._id.toString());
+      
+      console.log('🧪 Testing AI generation for trip:', trip._id);
+      console.log('- Destination:', trip.destination);
+      console.log('- Events count:', events.length);
+
+      // Test AI generation
+      const [suggestions, insights] = await Promise.all([
+        this.destinationAIService.generateDestinationSuggestions(trip, events),
+        this.destinationAIService.generateTravelInsights(trip, events),
+      ]);
+
+      return {
+        trip: {
+          destination: trip.destination,
+          eventCount: events.length,
+        },
+        suggestions: suggestions ? {
+          structure: {
+            restaurants: suggestions.restaurants?.length || 0,
+            sightseeing: suggestions.sightseeing?.length || 0,
+            activities: suggestions.activities?.length || 0,
+            dailyPlans: suggestions.dailyPlans?.length || 0,
+            navigationFromHotel: suggestions.navigationFromHotel?.length || 0,
+            localTips: suggestions.localTips?.length || 0,
+            transportation: suggestions.transportation?.length || 0,
+            weather: !!suggestions.weather,
+            culturalEtiquette: suggestions.culturalEtiquette?.length || 0,
+          },
+          firstRestaurant: suggestions.restaurants?.[0] || null,
+          firstActivity: suggestions.activities?.[0] || null,
+        } : null,
+        insights,
+      };
+    } catch (error) {
+      console.error('Error testing AI generation:', error);
+      return { error: 'Failed to test AI generation', details: error.message };
+    }
   }
 
   @Get('trips/:forwardingAddress')

@@ -89,6 +89,19 @@ export class EmailService {
       this.destinationAIService.generateTravelInsights(trip, events),
     ]);
 
+    console.log('📊 AI Generation Results:');
+    console.log('- Suggestions generated:', !!suggestions);
+    console.log('- Insights generated:', !!insights);
+    if (suggestions) {
+      console.log('- Suggestions structure:', {
+        restaurants: suggestions.restaurants?.length || 0,
+        sightseeing: suggestions.sightseeing?.length || 0,
+        activities: suggestions.activities?.length || 0,
+        dailyPlans: suggestions.dailyPlans?.length || 0,
+        hasLinks: suggestions.restaurants?.[0]?.googleMapsUrl ? 'YES' : 'NO',
+      });
+    }
+
     // Generate HTML email with AI suggestions
     const htmlContent = this.emailTemplateService.generateItineraryEmailHTML(
       trip, 
