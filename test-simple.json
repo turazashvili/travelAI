@@ -1,0 +1,6 @@
+{
+  "From": "test@example.com",
+  "To": "support@test.com",
+  "Subject": "NEW TRIP",
+  "TextBody": "Hello"
+}

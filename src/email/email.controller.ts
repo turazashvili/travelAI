@@ -1,0 +1,157 @@
+import { Controller, Post, Body, Get, Param } from '@nestjs/common';
+import { EmailService } from './email.service';
+import { ParsingService } from './parsing.service';
+import { ItineraryService } from './itinerary.service';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { User } from '../models/user.model';
+import { Trip } from '../models/trip.model';
+
+interface PostmarkInboundEmail {
+  From: string;
+  To: string;
+  Subject: string;
+  TextBody: string;
+  HtmlBody?: string;
+  Attachments?: any[];
+}
+
+@Controller('email')
+export class EmailController {
+  constructor(
+    private emailService: EmailService,
+    private parsingService: ParsingService,
+    private itineraryService: ItineraryService,
+    @InjectModel(User.name) private userModel: Model<User>,
+    @InjectModel(Trip.name) private tripModel: Model<Trip>,
+  ) {}
+
+  @Post('inbound')
+  async handleInboundEmail(@Body() emailData: PostmarkInboundEmail) {
+    try {
+      const { From: fromEmail, To: toEmail, Subject: subject, TextBody: textBody } = emailData;
+      
+      console.log(`Received email from ${fromEmail} to ${toEmail} with subject: ${subject}`);
+
+      // Route email based on subject and destination
+      if (subject.toUpperCase().includes('NEW TRIP')) {
+        await this.handleNewTripRequest(fromEmail);
+      } else if (subject.toUpperCase().includes('GET ITINERARY')) {
+        await this.handleItineraryRequest(fromEmail, toEmail);
+      } else {
+        await this.handleBookingEmail(fromEmail, toEmail, subject, textBody);
+      }
+
+      return { status: 'success', message: 'Email processed' };
+    } catch (error) {
+      console.error('Error processing email:', error);
+      return { status: 'error', message: 'Failed to process email' };
+    }
+  }
+
+  private async handleNewTripRequest(userEmail: string) {
+    try {
+      const trip = await this.emailService.createNewTrip(userEmail);
+      await this.emailService.sendWelcomeEmail(userEmail, trip.forwardingAddress);
+      console.log(`Created new trip for ${userEmail}: ${trip.forwardingAddress}`);
+    } catch (error) {
+      console.error('Error creating new trip:', error);
+    }
+  }
+
+  private async handleItineraryRequest(userEmail: string, tripEmail: string) {
+    try {
+      const trip = await this.emailService.findTripByForwardingAddress(tripEmail);
+      
+      if (!trip) {
+        console.log(`No active trip found for ${tripEmail}`);
+        return;
+      }
+
+      const events = await this.itineraryService.getTripEvents(trip._id.toString());
+      await this.emailService.sendItineraryEmail(userEmail, trip, events);
+      console.log(`Sent itinerary to ${userEmail} for trip ${trip._id}`);
+    } catch (error) {
+      console.error('Error sending itinerary:', error);
+    }
+  }
+
+  private async handleBookingEmail(userEmail: string, tripEmail: string, subject: string, textBody: string) {
+    try {
+      const trip = await this.emailService.findTripByForwardingAddress(tripEmail);
+      
+      if (!trip) {
+        console.log(`No active trip found for ${tripEmail}`);
+        return;
+      }
+
+      // Parse the email content
+      const parseResult = this.parsingService.parseEmail(textBody, subject);
+      
+      // Create travel event
+      const eventData = {
+        type: parseResult.type,
+        title: parseResult.extractedData.title,
+        startDateTime: parseResult.extractedData.startDateTime,
+        endDateTime: parseResult.extractedData.endDateTime,
+        location: parseResult.extractedData.location,
+        confirmationNumber: parseResult.extractedData.confirmationNumber,
+        provider: parseResult.extractedData.provider,
+        rawEmailData: textBody,
+        parsedData: parseResult.extractedData,
+        confidence: parseResult.confidence,
+      };
+
+      const event = await this.itineraryService.addEventToTrip(trip._id.toString(), eventData);
+      
+      // Send confirmation email
+      await this.emailService.sendBookingConfirmation(userEmail, event.title, event.type);
+      
+      console.log(`Added ${event.type} event to trip ${trip._id}: ${event.title}`);
+    } catch (error) {
+      console.error('Error processing booking email:', error);
+    }
+  }
+
+  @Get('health')
+  async healthCheck() {
+    return { status: 'ok', timestamp: new Date().toISOString() };
+  }
+
+  @Get('trips/:forwardingAddress')
+  async getTripByAddress(@Param('forwardingAddress') forwardingAddress: string) {
+    try {
+      const trip = await this.emailService.findTripByForwardingAddress(forwardingAddress);
+      if (!trip) {
+        return { error: 'Trip not found' };
+      }
+
+      const events = await this.itineraryService.getTripEvents(trip._id.toString());
+      return {
+        trip: {
+          id: trip._id,
+          forwardingAddress: trip.forwardingAddress,
+          title: trip.title,
+          destination: trip.destination,
+          startDate: trip.startDate,
+          endDate: trip.endDate,
+          isActive: trip.isActive,
+        },
+        events: events.map(event => ({
+          id: event._id,
+          type: event.type,
+          title: event.title,
+          startDateTime: event.startDateTime,
+          endDateTime: event.endDateTime,
+          location: event.location,
+          confirmationNumber: event.confirmationNumber,
+          provider: event.provider,
+          confidence: event.confidence,
+        }))
+      };
+    } catch (error) {
+      console.error('Error fetching trip:', error);
+      return { error: 'Failed to fetch trip' };
+    }
+  }
+}
