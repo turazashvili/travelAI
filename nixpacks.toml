@@ -1,0 +1,8 @@
+[build]
+cmd = "pnpm install && pnpm run build"
+
+[start]
+cmd = "pnpm run start:prod"
+
+[variables]
+NODE_ENV = "production"
