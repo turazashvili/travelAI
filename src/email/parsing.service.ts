@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import { AIParsingService } from './ai-parsing.service';
 
-export interface ParseResult {
+interface LegacyParseResult {
   type: string;
   confidence: number;
   extractedData: {
@@ -21,16 +22,72 @@ export interface ParseResult {
   };
 }
 
+export interface ParseResult {
+  events: Array<{
+    type: string;
+    title: string;
+    startDateTime?: Date;
+    endDateTime?: Date;
+    location?: {
+      address?: string;
+      city?: string;
+      country?: string;
+      airport?: string;
+    };
+    confirmationNumber?: string;
+    provider?: string;
+    parsedData: Record<string, any>;
+    confidence: number;
+  }>;
+  confidence: number;
+  summary: string;
+}
+
 @Injectable()
 export class ParsingService {
-  parseEmail(emailContent: string, subject: string): ParseResult {
-    // Try different parsing strategies in order of confidence
-    return this.parseByTemplates(emailContent, subject) ||
-           this.parseByHeuristics(emailContent, subject) ||
-           this.parseFallback(emailContent, subject);
+  constructor(private aiParsingService: AIParsingService) {}
+
+  async parseEmail(emailContent: string, subject: string): Promise<ParseResult> {
+    // Try AI parsing first (most accurate)
+    const aiResult = await this.aiParsingService.parseEmailWithAI(emailContent, subject);
+    if (aiResult && aiResult.events.length > 0) {
+      return {
+        events: this.aiParsingService.convertAIResultToEvents(aiResult),
+        confidence: aiResult.confidence,
+        summary: aiResult.summary,
+      };
+    }
+
+    // Fallback to heuristic parsing
+    console.log('AI parsing failed or unavailable, using heuristic parsing');
+    return this.parseWithHeuristics(emailContent, subject);
   }
 
-  private parseByTemplates(emailContent: string, subject: string): ParseResult | null {
+  private parseWithHeuristics(emailContent: string, subject: string): ParseResult {
+    // Try different parsing strategies in order of confidence
+    const legacyResult = this.parseByTemplatesLegacy(emailContent, subject) ||
+                        this.parseByHeuristicsLegacy(emailContent, subject) ||
+                        this.parseFallbackLegacy(emailContent, subject);
+
+    // Convert legacy result to new format
+    return {
+      events: [{
+        type: legacyResult.type,
+        title: legacyResult.extractedData.title,
+        startDateTime: legacyResult.extractedData.startDateTime,
+        endDateTime: legacyResult.extractedData.endDateTime,
+        location: legacyResult.extractedData.location,
+        confirmationNumber: legacyResult.extractedData.confirmationNumber,
+        provider: legacyResult.extractedData.provider,
+        parsedData: legacyResult.extractedData,
+        confidence: legacyResult.confidence,
+      }],
+      confidence: legacyResult.confidence,
+      summary: `Parsed ${legacyResult.type} booking using heuristic methods`,
+    };
+  }
+
+  private parseByTemplatesLegacy(emailContent: string, subject: string): LegacyParseResult | null {
     // Flight patterns
     if (this.isFlightEmail(emailContent, subject)) {
       return this.parseFlightEmail(emailContent, subject);
@@ -49,7 +106,7 @@ export class ParsingService {
     return null;
   }
 
-  private parseByHeuristics(emailContent: string, subject: string): ParseResult | null {
+  private parseByHeuristicsLegacy(emailContent: string, subject: string): LegacyParseResult | null {
     const extractedData: any = {
       title: this.extractTitle(subject, emailContent),
     };
@@ -88,7 +145,7 @@ export class ParsingService {
     };
   }
 
-  private parseFallback(emailContent: string, subject: string): ParseResult {
+  private parseFallbackLegacy(emailContent: string, subject: string): LegacyParseResult {
     return {
       type: 'other',
       confidence: 0.3,
@@ -110,7 +167,7 @@ export class ParsingService {
     return flightKeywords.some(keyword => content.includes(keyword));
   }
 
-  private parseFlightEmail(emailContent: string, subject: string): ParseResult {
+  private parseFlightEmail(emailContent: string, subject: string): LegacyParseResult {
     const extractedData: any = {
       title: this.extractTitle(subject, emailContent),
     };
@@ -166,7 +223,7 @@ export class ParsingService {
     return hotelKeywords.some(keyword => content.includes(keyword));
   }
 
-  private parseHotelEmail(emailContent: string, subject: string): ParseResult {
+  private parseHotelEmail(emailContent: string, subject: string): LegacyParseResult {
     const extractedData: any = {
       title: this.extractTitle(subject, emailContent),
     };
@@ -210,7 +267,7 @@ export class ParsingService {
     return restaurantKeywords.some(keyword => content.includes(keyword));
   }
 
-  private parseRestaurantEmail(emailContent: string, subject: string): ParseResult {
+  private parseRestaurantEmail(emailContent: string, subject: string): LegacyParseResult {
     const extractedData: any = {
       title: this.extractTitle(subject, emailContent),
     };

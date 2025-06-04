@@ -86,28 +86,31 @@ export class EmailController {
       }
 
       // Parse the email content
-      const parseResult = this.parsingService.parseEmail(textBody, subject);
+      const parseResult = await this.parsingService.parseEmail(textBody, subject);
       
-      // Create travel event
-      const eventData = {
-        type: parseResult.type,
-        title: parseResult.extractedData.title,
-        startDateTime: parseResult.extractedData.startDateTime,
-        endDateTime: parseResult.extractedData.endDateTime,
-        location: parseResult.extractedData.location,
-        confirmationNumber: parseResult.extractedData.confirmationNumber,
-        provider: parseResult.extractedData.provider,
-        rawEmailData: textBody,
-        parsedData: parseResult.extractedData,
-        confidence: parseResult.confidence,
-      };
+      // Process all events from the parsing result
+      const addedEvents = [];
+      for (const eventData of parseResult.events) {
+        const fullEventData = {
+          ...eventData,
+          rawEmailData: textBody,
+        };
 
-      const event = await this.itineraryService.addEventToTrip(trip._id.toString(), eventData);
+        const event = await this.itineraryService.addEventToTrip(trip._id.toString(), fullEventData);
+        addedEvents.push(event);
+        
+        console.log(`Added ${event.type} event to trip ${trip._id}: ${event.title}`);
+      }
       
-      // Send confirmation email
-      await this.emailService.sendBookingConfirmation(userEmail, event.title, event.type);
+      // Send confirmation email with summary
+      if (addedEvents.length > 0) {
+        const summary = addedEvents.length === 1 
+          ? addedEvents[0].title 
+          : `${addedEvents.length} bookings (${addedEvents.map(e => e.type).join(', ')})`;
+        
+        await this.emailService.sendBookingConfirmation(userEmail, summary, 'booking');
+      }
       
-      console.log(`Added ${event.type} event to trip ${trip._id}: ${event.title}`);
     } catch (error) {
       console.error('Error processing booking email:', error);
     }
