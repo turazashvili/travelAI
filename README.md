@@ -42,7 +42,7 @@ An AI-powered email-first service that transforms scattered travel booking confi
 1. **Clone and install dependencies:**
    ```bash
    git clone https://github.com/turazashvili/travelAI.git
-   cd travel-itinerary-builder
+   cd travelAI
    pnpm install
    ```
 
