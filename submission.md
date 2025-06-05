@@ -26,7 +26,21 @@ I built **Travel Itinerary Builder** - an AI-powered service that transforms sca
 🔗 **Demo:** [Youtube Video](https://www.youtube.com/watch?v=m9ljQ61GXvc&ab_channel=NikolozTurazashvili)
 {% embed https://www.youtube.com/watch?v=m9ljQ61GXvc&ab_channel=NikolozTurazashvili %}
 
-**Important Note for Testing:** Currently, due to Postmark's pending approval restrictions, I'm limited to sending emails only within my domain. External email testing is temporarily unavailable. Please check the video demonstration and GitHub repository for a complete overview of the functionality. The system works perfectly as shown in the demo.
+**Testing Instructions:**
+
+To test the application, send an email to: **support@nikolabs.ge**
+
+1. **Create a New Trip:**
+   ```
+   To: support@nikolabs.ge
+   Subject: NEW TRIP
+   ```
+   You'll receive a unique trip address like `trip-abc123@nikolabs.ge`
+
+2. **Add Bookings:** Send any booking confirmations to your trip address
+3. **Get Itinerary:** Email your trip address with subject "GET ITINERARY"
+
+**Note:** Due to Postmark's pending approval restrictions, responses are currently limited to emails within the nikolabs.ge domain. For external domains, please check the video demonstration and GitHub repository for a complete overview of the functionality.
 
 
 **Screenshots:**
