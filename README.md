@@ -220,14 +220,30 @@ pnpm run start:prod   # Run production build
 pnpm run test         # Run tests
 ```
 
-### Adding New Parsing Rules
+### Adding New Booking Support
 
-To support new booking formats, extend the `ParsingService`:
+Your system automatically handles new booking formats through AI parsing, but you can enhance accuracy:
 
-1. Add detection logic in `parseByTemplates()`
-2. Create specific parsing method (e.g., `parseTrainEmail()`)
-3. Add type-specific extraction helpers
-4. Update confidence scoring
+#### 🤖 AI-First Approach (Recommended)
+- The OpenAI integration automatically adapts to new booking formats
+- Simply forward new booking types - the AI extracts relevant data automatically
+- The system learns patterns and improves over time through function calling
+
+#### ⚙️ Manual Enhancement (Optional)
+```typescript
+// Enhance AI prompts in destination-ai.service.ts
+const prompt = `Extract travel information including new booking types like:
+- Train reservations with car/seat numbers
+- Bus tickets with route information  
+- Cruise bookings with cabin details
+...`;
+```
+
+#### 🔧 Testing New Formats
+- Forward sample emails of new booking types to your trip address
+- Monitor parsing accuracy in application logs
+- The flexible MongoDB schema automatically accommodates new fields
+- Adjust AI prompts if needed for better extraction accuracy
 
 ### Testing Email Processing
 
